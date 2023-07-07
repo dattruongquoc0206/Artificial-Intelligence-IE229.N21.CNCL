@@ -3,16 +3,12 @@
 
 #Import lib
 from __future__ import absolute_import, division, print_function
-
 ## Import TensorFlow >= 1.10 and enable eager execution
 import tensorflow as tf
-
 tf.enable_eager_execution()
 tf.executing_eagerly()
-
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
-
 import unicodedata
 import re
 import numpy as np
@@ -41,31 +37,31 @@ test_vi = os.path.join(folder, 'tst2013.vi')
 
 def preprocess_sentence(w):
     """
-    Hàm làm sạch dữ liệu
+    Data preprocessing function
 
-    Tham số:
-      w: câu đầu vào
+    parameter:
+      w: sentence input
 
     Returns:
-      Câu đã được làm sạch
+      sentence after datapreprocessing
     """
   
     w = w.lower().strip()
         
-    # loại bỏ &apos; và &quot; trong dữ liệu
+    # remove &apos; &quot; in dataset
     w = re.sub(" &apos;", "", w)
     w = re.sub(" &quot;", "", w)
     
-    # loại bỏ các kí tự đặc biệt & các dấu câu, chỉ giữ lại chữ, số từ 0-9 và khoảng trắng
+    # remove special characters & punctuation, keep only letters, numbers from 0-9 and spaces
     w = re.sub(r"[^\w0-9 ]+", " ", w)
     
-    # rút gọn nhiều khoảng trắng dài thành 1 khoảng trắng
+    # shorten multiple long spaces into 1 space
     w = re.sub(r"[\s]+", " ", w)
     
-    # xóa khoảng trắng phía đầu và đuôi của câu
+    # Remove the leading and trailing spaces in sentences
     w = w.strip()
     
-    # thêm <start> và <end> ở đầu và cuối câu để model biết nơi bắt đầu và kết thúc dự đoán
+    # add <start> and <end> at the beginning and end of the sentence so that the model knows where to start and end the prediction
     w = '<start> ' + w + ' <end>'
     
     return w
@@ -77,14 +73,14 @@ print(preprocess_sentence(vi_sentence))
 
 def create_dataset(input_path, target_path):
   """
-  Hàm nhập dữ liệu từ đường dẫn, làm sạch và trả về các cặp câu Anh - Việt
+  The function imports data from the path, cleans and returns English - Vietnamese sentence pairs
   
-  Tham số:
-    input_path: đường dẫn dữ liệu đầu vào
-    target_path: đường dẫn dữ liệu đầu ra
+  Parameters:
+    input_path: input data path
+    target_path: output data path
     
   Returns:
-    List các cặp câu Anh - Việt tương ứng
+    List of corresponding pairs of English - Vietnamese sentences
   """
   
   input_lines = open(input_path, encoding='UTF-8').read().strip().split('\n')
@@ -102,11 +98,11 @@ train_pairs = create_dataset(train_en, train_vi)
 
 def print_samples(pairs, number):
   """
-  Hàm in ra một số câu Anh - Việt
+  The function prints some English - Vietnamese sentences
   
-  Tham số:
-    pairs: list các cặp câu Anh - Việt
-    number: số lượng các cặp câu cần in
+  Parameters:
+    pairs: list of English - Vietnamese sentence pairs
+    number: number of pairs of sentences to print
     
   Returns:
     None
@@ -120,14 +116,14 @@ print_samples(train_pairs, 10)
 
 def short_sentences(pairs):
   """
-  Hàm lọc ra các câu Anh - Việt trọn vẹn có độ dài từ 60 chữ trở xuống, dựa trên số liệu đã thống kê
-  và giới hạn bộ nhớ của GPU dùng để huấn luyện
+  The function filters out complete English - Vietnamese sentences with a length of 60 words or less, based on statistics
+  and limit the memory of the GPU used for training
   
-  Tham số:
-    pairs: list các cặp câu Anh - Việt
+  Parameters:
+    pairs: list of English - Vietnamese sentence pairs
     
   Returns:
-    List các cặp câu Anh - Việt có độ dài từ 60 chữ trở xuống
+    List of pairs of English - Vietnamese sentences with a length of 60 words or less
   """
   
   result = []
@@ -150,21 +146,20 @@ print_samples(test_pairs, 10)
 # (e.g., 5 -> "dad") for each language,
 class LanguageIndex():
   """
-  Cập nhật vocab từ các câu của ngôn ngữ cần khởi tạo
-  Tạo mapping chữ -> số hiệu ("dad" -> 5) và số hiệu -> chữ (5 -> "dad")
+  Update vocab from the sentences of the language to be initialized
+  Create mapping letters -> numbers ("dad" -> 5) and numbers -> letters (5 -> "dad")
   """
   
   def __init__(self, lang):
     """
-    Hàm khởi tạo
+    Initialization function
     
-    Tham số:
-      lang: ngôn ngữ cần khởi tạo
+    Parameters:
+      lang: language to initialize
       
     Returns:
       None
     """
-    
     self.lang = lang
     self.word2idx = {}
     self.idx2word = {}
@@ -174,8 +169,8 @@ class LanguageIndex():
     
   def create_index(self):
     """
-    Cập nhật vocab từ các câu của ngôn ngữ cần khởi tạo
-    Tạo mapping chữ -> số hiệu và số hiệu -> chữ
+    Update vocab from the sentences of the language to be initialized
+    Create mapping letters -> numbers and numbers -> letters
     """
     
     for phrase in self.lang:
@@ -192,56 +187,56 @@ class LanguageIndex():
 
 def max_length(tensor):
     """
-    Trả về câu dài nhất trong tensor
+    Returns the longest sentence in tensor
     
-    Tham số:
-      tensor: tensor của các câu
+    Parameters:
+      tensor: tensor of sentences
     """
     
     return max(len(t) for t in tensor)
 
 def load_train_dataset(input_path, target_path):
   """
-  Nhập dữ liệu đầu vào cho tập Train
-  Cập nhật vocab của từng ngôn ngữ Anh, Việt
-  Lọc ra những cặp câu Anh - Việt có độ dài <= 60 chữ (lựa chọn 60 chữ là dựa trên thống kê và giới hạn GPU)
-  Tạo tensor chứa index của các cặp câu Anh - Việt trong tập Train
-  Lấp đầy các câu ngắn bằng index 0
+  Input data for the set Train
+  Update vocab of each language English, Vietnamese
+  Filter out pairs of English - Vietnamese sentences with length <= 60 words (choosing 60 words is based on statistics and GPU limitations)
+  Create tensor containing the index of pairs of English - Vietnamese sentences in the set Train
+  Fill short sentences with index 0
   
-  Tham số:
-    input_path: đường dẫn của tập câu Tiếng Anh
-    target_path: đường dẫn của tập câu Tiếng Việt
+  Parameters:
+    input_path: path of the English sentence set
+    target_path: path of Vietnamese sentence set
     
   Returns:
-    input_tensor: tensor index Tiếng Anh
-    output_tensor: tensor index Tiếng Việt
-    inp_lang: vocab Tiếng Anh
-    targ_lang: vocab Tiếng Việt
-    max_length_inp: độ dài lớn nhất trong tập câu Tiếng Anh
-    max_length_tar: độ dài lớn nhất trong tập câu Tiếng Việt
+    input_tensor: tensor index English
+    output_tensor: tensor index Vietnamese
+    inp_lang: English vocab
+    targ_lang: Vietnamese vocab
+    max_length_inp: the maximum length in the set of English sentences
+    max_length_tar: the maximum length in the Vietnamese sentence set
     
   """
   
-  # Nhập dữ liệu đầu vào cho tập Train
+  # Input data for the Train dataset
   pairs = create_dataset(input_path, target_path)
   
-  # Cập nhật vocab của từng ngôn ngữ Anh, Việt
+  # Update vocab of each language English, Vietnamese
   inp_lang = LanguageIndex(en for en, vi in pairs)
   targ_lang = LanguageIndex(vi for en, vi in pairs)
   
-  # Lọc ra những cặp câu Anh - Việt có độ dài <= 60 chữ
+  # Filter out pairs of English - Vietnamese sentences with length <= 60 words
   pairs = short_sentences(pairs)
 
-  # Chuyển các từ trong câu Tiếng Anh sang index
+  # Convert words in English sentences to index
   input_tensor = [[inp_lang.word2idx[word] for word in en.split()] for en, vi in pairs]
 
-  # Chuyển các từ trong câu Tiếng Việt sang index
+  # Convert words in Vietnamese sentences to index
   target_tensor = [[targ_lang.word2idx[word] for word in vi.split()] for en, vi in pairs]
 
-  # Tính độ dài lớn nhất trong tập câu Tiếng Anh và Tiếng Việt
+  # Calculate the maximum length in the set of English and Vietnamese sentences
   max_length_inp, max_length_tar = max_length(input_tensor), max_length(target_tensor)
 
-  # Lấp đầy các câu ngắn bằng index 0
+  # Fill short sentences with index 0
   input_tensor = tf.keras.preprocessing.sequence.pad_sequences(input_tensor, maxlen=max_length_inp, padding='post')
 
   target_tensor = tf.keras.preprocessing.sequence.pad_sequences(target_tensor, maxlen=max_length_tar, padding='post')
@@ -251,31 +246,31 @@ input_tensor_train, target_tensor_train, inp_lang, targ_lang, max_length_inp, ma
 
 def load_val_dataset(input_path, target_path, inp_lang, targ_lang):
   """
-  Nhập dữ liệu đầu vào cho tập Validation
-  Tạo tensor chứa index của các cặp câu Anh - Việt trong tập Validation dựa trên vocab của tập Train
-  Lấp đầy các câu ngắn bằng index 0
+  Enter input data for the Validation set
+  Create tensor containing the index of English - Vietnamese sentence pairs in the Validation set based on the vocab of Train
+  Fill short sentences with index 0
   
-  Tham số:
-    input_path: đường dẫn của tập câu Tiếng Anh
-    target_path: đường dẫn của tập câu Tiếng Việt
-    inp_lang: vocab Tiếng Anh của tập Train
-    targ_lang: vocab Tiếng Việt của tập Train
+  Parameters:
+    input_path: path of the English sentence set
+    target_path: path of Vietnamese sentence set
+    inp_lang: English vocab of Train
+    targ_lang: Vietnamese vocab of Train
     
   Returns:
-    input_tensor: tensor index Tiếng Anh của tập Validation
-    output_tensor: tensor index Tiếng Việt của tập Validation
-    inp_lang: vocab Tiếng Anh
-    targ_lang: vocab Tiếng Việt
-    max_length_inp: độ dài lớn nhất trong tập câu Tiếng Anh
-    max_length_tar: độ dài lớn nhất trong tập câu Tiếng Việt
+    input_tensor: English tensor index of the Validation set
+    output_tensor: Vietnamese tensor index of the Validation set
+    inp_lang: English vocab
+    targ_lang: Vietnamese vocab
+    max_length_inp: the maximum length in the set of English sentences
+    max_length_tar: the maximum length in the Vietnamese sentence set
     
   """
   
-  # Nhập dữ liệu đầu vào cho tập Validation
+  # Enter input data for the Validation dataset
   pairs = create_dataset(input_path, target_path)
   
-  # Chuyển các từ trong câu Tiếng Anh và Tiếng Việt sang index dựa trên vocab của tập Train
-  # Từ nào không có trong vocab của tập Train thì cho index = 0
+  # Convert words in English and Vietnamese sentences to an index based on the Vocab of Train dataset
+  # If the word is not in the vocab of the Train dataset, index = 0
   
   input_tensor = []
   target_tensor = []
@@ -299,10 +294,10 @@ def load_val_dataset(input_path, target_path, inp_lang, targ_lang):
       targets.append(index)
     target_tensor.append(targets)
 
-  # Tính độ dài lớn nhất trong tập câu Tiếng Anh và Tiếng Việt
+  # Calculate the maximum length in the set of English and Vietnamese sentences
   max_length_inp, max_length_tar = max_length(input_tensor), max_length(target_tensor)
 
-  # Lấp đầy các câu ngắn bằng index 0
+  # Fill short sentences with index 0
   input_tensor = tf.keras.preprocessing.sequence.pad_sequences(input_tensor, maxlen=max_length_inp, padding='post')
   input_tensor = tf.convert_to_tensor(input_tensor)
 
@@ -328,10 +323,10 @@ validation_dataset = validation_dataset.batch(BATCH_SIZE, drop_remainder=True)
 
 def gru(units):
   """
-  Hàm setup gru dựa trên điều kiện có GPU hay không
+  The gru setup function is based on whether there is a GPU or not
   
-  Tham số:
-    units: số lượng hidden units
+  Parameters:
+    units: number of hidden units
   """
   
   if tf.test.is_gpu_available():
@@ -348,18 +343,18 @@ def gru(units):
 
 class Encoder(tf.keras.Model):
     """
-    Encoder cho Tiếng Anh
+    Encoder for English
     """
   
     def __init__(self, vocab_size, embedding_dim, enc_units, batch_sz):
         """
-        Hàm khởi tạo thông số cho encoder
+        Parameter constructor for encoder
 
-        Tham số:
-          vocab_size: kích cỡ vocab Tiếng Anh
-          embedding_dim: kích cỡ word vector
-          enc_units: số lượng hidden units
-          batch_sz: kích cỡ 1 batch
+        Parameters:
+          vocab_size: English vocab size
+          embedding_dim: word vector size
+          enc_units: number of hidden units
+          batch_sz: size 1 batch
         """
       
         super(Encoder, self).__init__()
@@ -370,10 +365,10 @@ class Encoder(tf.keras.Model):
         
     def call(self, x, hidden):
         """
-        Hàm chạy
+        Run function
 
         Returns:
-          output, state: đầu ra của Encoder
+          output, state: output of Encoder
         """
       
         x = self.embedding(x)
@@ -388,15 +383,15 @@ class Encoder(tf.keras.Model):
     
 class BahdanauAttention(tf.keras.Model):
   """
-  Bahdanau Attention cho seq2seq Anh - Việt
+  Bahdanau Attention for seq2seq Anh - Việt
   """
   
   def __init__(self, units):
     """
-    Khởi tạo Attention
+    Initialize Attention
     
-    Tham số:
-      units: số lượng hiddden units của decoder
+    Parameters:
+      units: number of hidden units of decoder
     """
     super(BahdanauAttention, self).__init__()
     self.W1 = tf.keras.layers.Dense(units)
@@ -425,15 +420,15 @@ class BahdanauAttention(tf.keras.Model):
   
 class LuongAttention(tf.keras.Model):
   """
-  Lương Attention cho seq2seq Anh - Việt
+  LuongAttention for seq2seq English - Vietnamese
   """
 
   def __init__(self, units):
     """
-    Khởi tạo Attention
+    Initialize Attention
     
-    Tham số:
-      units: số lượng hiddden units của decoder
+    Parameters:
+      units: number of hidden units of decoder
     """
     super(LuongAttention, self).__init__()
     self.W = tf.keras.layers.Dense(units)
@@ -458,18 +453,18 @@ class LuongAttention(tf.keras.Model):
 
 class Decoder(tf.keras.Model):
     """
-    Decoder cho Tiếng Việt
+    Decoder for Vietnamese
     """
   
     def __init__(self, vocab_size, embedding_dim, dec_units, batch_sz):
       """
-      Hàm khởi tạo thông số cho decoder
+      Parameter constructor for decoder
       
-      Tham số:
-        vocab_size: kích cỡ vocab Tiếng Việt
-        embedding_dim: kích cỡ word vector
-        dec_units: số lượng hidden units
-        batch_sz: kích cỡ 1 batch
+      Parameters:
+        vocab_size: Vietnamese vocab size
+        embedding_dim: word vector size
+        dec_units: number of hidden units
+        batch_sz: size 1 batch
       """
       
       super(Decoder, self).__init__()
@@ -505,7 +500,7 @@ class Decoder(tf.keras.Model):
         
     def initialize_hidden_state(self):
         """
-        Hàm khởi tạo hidden state
+        Hidden state constructor
         """
         return tf.zeros((self.batch_sz, self.dec_units))
 
@@ -516,7 +511,7 @@ LEARNING_RATE = 0.001
 optimizer = tf.train.AdamOptimizer(LEARNING_RATE)
 def loss_function(real, pred):
   """
-  Hàm tính loss giữa prediction và target
+  Loss calculation function between prediction and target
   """
   
   mask = 1 - np.equal(real, 0)
@@ -533,16 +528,16 @@ checkpoint = tf.train.Checkpoint(optimizer=optimizer,
 
 def epoch_training(encoder, decoder, dataset, global_step, mb, num_step):
     """
-    Hàm huấn luyện trên tập Train
+    Training function on the set Train
 
-    Tham số:
-      encoder: encoder Tiếng Anh
-      decoder: decoder Tiếng Việt
-      dataset: train datset
-      global_step, mb, num_step: thông số vẽ đồ thị mô hình
+    Parameters:
+      encoder: English encoder
+      decoder: Vietnamese decoder
+      dataset: train dataset
+      global_step, mb, num_step: model plotting parameters
 
     Returns:
-      loss trung bình của 1 epoch
+      average loss of 1 epoch
     """
   
     train_losses = [] # Chứa giá trị loss của các batch
@@ -585,16 +580,16 @@ def epoch_training(encoder, decoder, dataset, global_step, mb, num_step):
 
 def epoch_evaluation(encoder, decoder, dataset, mb, num_step):
     """
-    Hàm đánh giá trên tập Validation
+    Evaluation function on the set of Validation
 
-    Tham số:
-      encoder: encoder Tiếng Anh
-      decoder: decoder Tiếng Việt
-      dataset: validation datset
-      global_step, mb, num_step: thông số vẽ đồ thị mô hình
+    Parameters:
+      encoder: English encoder
+      decoder: Vietnamese decoder
+      dataset: validation dataset
+      global_step, mb, num_step: model plotting parameters
 
     Returns:
-      loss trung bình của 1 epoch
+      average loss of 1 epoch
     """
   
     val_losses = [] # Chứa giá trị loss của các batch
@@ -649,23 +644,23 @@ for epoch in mb:
     # Training
     training_loss = epoch_training(encoder, decoder, train_dataset, global_step, mb, train_step)
     
-    # Cập nhật thông tin sau khi huấn luyện
+    # Update information after training
     training_losses.append(training_loss)
     
     # Validating
     valid_loss = epoch_evaluation(encoder, decoder, validation_dataset, mb, val_step)
     
-    # Cập nhật thông tin sau khi validate
+    # Update information after validation
     validation_losses.append(valid_loss)
     
-    # Cập nhật đồ thị
+    # Graph update
     global_step.assign_add(1)
     mb.update_graph([[x, training_losses], [x, validation_losses]], [0,EPOCHS], [0,5])
     
     print('Finish train epoch {} with loss {:.4f}'.format(epoch, training_loss))
     print('Finish validate epoch {} with loss {:.4f}'.format(epoch,valid_loss))
     
-    # Update score và lưu model có score tốt nhất
+    # Update score and save the model with the best score
     if (epoch + 1) % 2 == 0:
       checkpoint.save(file_prefix = checkpoint_prefix)
     ### END CODE HERE
@@ -675,29 +670,29 @@ checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
 ###########CHECK OUTPUT###############
 def evaluate(sentence, encoder, decoder, inp_lang, targ_lang, max_length_inp, max_length_targ):
     """
-    Hàm dịch từng câu và tạo thông số ma trận tương quan attention giữa câu Tiếng Anh và câu Tiếng Việt
+    The function translates each sentence and creates the parameter of the correlation matrix of attention between English sentences and Vietnamese sentences
 
-    Tham số:
-      sentence: câu Tiếng Anh
-      encoder: encoder Tiếng Anh
-      decoder: decoder Tiếng Việt
-      inp_lang: vocab Tiếng Anh
-      targ_lang: vocab Tiếng Việt
-      max_length_inp: độ dài lớn nhất câu Tiếng Anh
-      max_length_targ: độ dài lớn nhất câu Tiếng Việt
+    Parameters:
+      sentence: English sentence
+      encoder: English encoder
+      decoder: Vietnamese decoder
+      inp_lang: English vocab
+      targ_lang: Vietnamese vocab
+      max_length_inp: longest English sentence length
+      max_length_targ: maximum length of Vietnamese sentences
 
     Returns:
-      result: câu Tiếng Việt đã dịch
-      sentence: câu Tiếng Anh đưa vào
-      attention_plot: thống số để vẽ ma trận Attention
+      result: translated Vietnamese sentence
+      sentence: English sentence inserted
+      attention_plot: statistics to plot the matrix Attention
     """
   
     attention_plot = np.zeros((max_length_targ, max_length_inp))
     
-    # Làm sạch câu Tiếng Anh
+    # Clean up English sentences
     sentence = preprocess_sentence(sentence)
     
-    # Chuyển câu Tiếng Anh sang index
+    # Convert English sentences to index
     inputs = []
     for word in sentence.split():
       try:
@@ -709,7 +704,7 @@ def evaluate(sentence, encoder, decoder, inp_lang, targ_lang, max_length_inp, ma
     inputs = tf.keras.preprocessing.sequence.pad_sequences([inputs], maxlen=max_length_inp, padding='post')
     inputs = tf.convert_to_tensor(inputs)
     
-    # Dịch
+    # translate
     
     result = ''
 
@@ -742,12 +737,12 @@ def evaluate(sentence, encoder, decoder, inp_lang, targ_lang, max_length_inp, ma
 # function for plotting the attention weights
 def plot_attention(attention, sentence, predicted_sentence):
     """
-    Hàm vẽ ma trận Attention
+    Attention . matrix drawing function
 
-    Tham số:
-      attention: thông số ma trận
-      sentence: câu Tiếng Anh
-      predicted_sentence: câu Tiếng Việt đã dịch
+    Parameters:
+      attention: matrix parameter
+      sentence: English sentence
+      predicted_sentence: translated Vietnamese sentence
 
     Returns:
       None
@@ -765,16 +760,16 @@ def plot_attention(attention, sentence, predicted_sentence):
     plt.show()
 def translate(sentence, encoder, decoder, inp_lang, targ_lang, max_length_inp, max_length_targ):
     """
-    Hàm dịch và vẽ ma trận attention
+    The translation function and drawing the attention . matrix
 
-    Tham số:
-      sentence: câu Tiếng Anh
-      encoder: encoder Tiếng Anh
-      decoder: decoder Tiếng Việt
-      inp_lang: vocab Tiếng Anh
-      targ_lang: vocab Tiếng Việt
-      max_length_inp: độ dài lớn nhất câu Tiếng Anh
-      max_length_targ: độ dài lớn nhất câu Tiếng Việt
+    Parameters:
+      sentence: English sentence
+      encoder: English encoder
+      decoder: Vietnamese decoder
+      inp_lang: English vocab
+      targ_lang: Vietnamese vocab
+      max_length_inp: longest English sentence length
+      max_length_targ: maximum length of Vietnamese sentences
 
     Returns:
       None
