@@ -922,3 +922,10 @@ for i in range(len(pairs_2)):
 
 
 ##############CALCULATE Average Bleu Score base on test dataset#######################################
+
+bleu_score_list = []
+for i in range(len(translation_result)):
+  bleu_score_list.append(translation_result[i][3])
+
+mean_bleu_score = sum(bleu_score_list)/len(bleu_score_list)
+print("Average Bleu Score: ", mean_bleu_score)
